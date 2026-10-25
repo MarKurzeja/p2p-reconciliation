@@ -1,10 +1,16 @@
 -- =====================================================================
 -- Procure-to-Pay Reconciliation: PO vs Goods Receipt vs Invoice vs Bank
--- Tested on SQLite 3.53. Also works on PostgreSQL / SQL Server with
--- small changes (marked with a DIALECT comment).
+-- Runs as-is on PostgreSQL 16+ and on SQLite (python/run_sql.py).
 -- Tables: suppliers, purchase_orders, goods_receipts,
 --         supplier_invoices, bank_payments, fx_rates
 -- =====================================================================
+
+-- Drop views first, dependents before their sources
+DROP VIEW IF EXISTS v_discrepancy_report;
+DROP VIEW IF EXISTS v_payment_status;
+DROP VIEW IF EXISTS v_payment_match_exact;
+DROP VIEW IF EXISTS v_duplicate_invoices;
+DROP VIEW IF EXISTS v_three_way;
 
 
 -- ---------------------------------------------------------------------
@@ -12,7 +18,6 @@
 --     Every PO gets exactly one category.
 --     FULL OUTER JOIN so that invoices without a PO are caught too.
 -- ---------------------------------------------------------------------
-DROP VIEW IF EXISTS v_three_way;
 CREATE VIEW v_three_way AS
 WITH grn AS (
     SELECT po_id,
@@ -57,8 +62,9 @@ SELECT
     -- amount (in invoice currency) billed above what was received / ordered
     CASE
         WHEN po.po_id IS NULL OR grn.po_id IS NULL THEN inv.amount
-        ELSE ROUND(inv.amount - MIN(inv.qty_invoiced, grn.qty_received) * po.unit_price, 2)
-             -- DIALECT: PostgreSQL -> LEAST(...)
+        ELSE ROUND(inv.amount - CASE WHEN inv.qty_invoiced < grn.qty_received
+                                     THEN inv.qty_invoiced ELSE grn.qty_received END
+                                * po.unit_price, 2)
     END AS overbilled_amount
 FROM purchase_orders po
 LEFT JOIN grn ON grn.po_id = po.po_id
@@ -77,7 +83,6 @@ ORDER BY n_records DESC;
 -- ---------------------------------------------------------------------
 -- Q2. DUPLICATE INVOICES – same number from the same supplier
 -- ---------------------------------------------------------------------
-DROP VIEW IF EXISTS v_duplicate_invoices;
 CREATE VIEW v_duplicate_invoices AS
 SELECT *
 FROM (
@@ -97,7 +102,6 @@ FROM v_duplicate_invoices;
 -- Q3. PAYMENTS vs INVOICES – stage 1: exact match on the transfer
 --     title (= invoice number). The rest goes to Python (fuzzy matching).
 -- ---------------------------------------------------------------------
-DROP VIEW IF EXISTS v_payment_match_exact;
 CREATE VIEW v_payment_match_exact AS
 SELECT
     p.payment_id,
@@ -123,7 +127,6 @@ JOIN supplier_invoices i
 LEFT JOIN fx_rates fx ON fx.rate_date = p.payment_date;
 
 -- Classify matched payments
-DROP VIEW IF EXISTS v_payment_status;
 CREATE VIEW v_payment_status AS
 SELECT *,
        ROUND(amount_pln - expected_pln, 2) AS diff_pln,
@@ -161,7 +164,6 @@ WHERE NOT EXISTS (
 -- ---------------------------------------------------------------------
 -- Q4. SUMMARY REPORT – all discrepancy categories in one table
 -- ---------------------------------------------------------------------
-DROP VIEW IF EXISTS v_discrepancy_report;
 CREATE VIEW v_discrepancy_report AS
 SELECT 'three_way' AS source, po_id AS ref_id, supplier_id,
        match_status AS discrepancy_type, overbilled_amount AS amount, currency
@@ -185,12 +187,12 @@ ORDER BY n DESC;
 -- Q5. MONTHLY TREND – are discrepancies growing over time? (CTE)
 -- ---------------------------------------------------------------------
 WITH monthly AS (
-    SELECT SUBSTR(po_date, 1, 7) AS month,          -- DIALECT: PostgreSQL -> TO_CHAR(po_date,'YYYY-MM')
+    SELECT SUBSTR(CAST(po_date AS TEXT), 1, 7) AS month,
            COUNT(*) AS n_po,
            SUM(CASE WHEN match_status IN ('MATCHED', 'MATCHED_TIMING') THEN 1 ELSE 0 END) AS n_matched
     FROM v_three_way
     WHERE po_date IS NOT NULL
-    GROUP BY SUBSTR(po_date, 1, 7)
+    GROUP BY SUBSTR(CAST(po_date AS TEXT), 1, 7)
 )
 SELECT month, n_po, n_matched,
        ROUND(100.0 * n_matched / n_po, 1) AS match_rate_pct

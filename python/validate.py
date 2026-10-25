@@ -7,6 +7,7 @@ Requires: pandas  (optional rapidfuzz: pip install rapidfuzz - faster and better
 without it the script falls back to the built-in difflib)
 """
 
+import os
 import re
 import sqlite3
 import unicodedata
@@ -39,12 +40,16 @@ for df, cols in [(inv, ["invoice_date"]), (pay, ["payment_date"]), (fx, ["rate_d
 
 
 # ------------------------------------------------------------------ 1. name normalization
+LEGAL_FORMS = {"ltd", "limited", "plc", "inc", "llc", "co", "company", "corp",
+               "gmbh", "srl", "bv", "sl", "sro", "ab", "kft", "sa"}
+
+
 def normalize(name: str) -> str:
-    """'MIĘSO-POL SP ZOO' -> 'mieso pol'; strips Polish characters, legal forms and punctuation."""
+    """'NUTS AND DRIED FRUIT COMPANY LTD.' -> 'nuts and dried fruit'; strips legal forms, punctuation, case."""
     s = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode().lower()
-    s = s.replace("ł", "l")
-    s = re.sub(r"\b(sp\.? ?z ?o\.? ?o\.?|sp zoo|s\.?a\.?|gmbh|s\.r\.l\.|b\.v\.|s\.l\.|s\.r\.o\.|ab|kft\.?|dystr\.?)\b", " ", s)
+    s = s.replace("&", " and ").replace(".", "")
     s = re.sub(r"[^a-z0-9 ]", " ", s)
+    s = " ".join(w for w in s.split() if w not in LEGAL_FORMS)
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -108,7 +113,11 @@ for name, df in [("suppliers", sup.drop(columns="name_norm")), ("purchase_orders
                  ("bank_payments", pd.read_csv(f"{D}/bank_payments.csv")),
                  ("fx_rates", pd.read_csv(f"{D}/fx_rates.csv"))]:
     df.to_sql(name, con, index=False)
-sql = "\n".join(l.split("--")[0] for l in open("sql/reconciliation.sql", encoding="utf-8").read().splitlines())
+here = os.path.dirname(os.path.abspath(__file__))
+sql_path = next(p for p in ["sql/reconciliation.sql", "reconciliation.sql",
+                            os.path.join(here, "..", "sql", "reconciliation.sql"),
+                            os.path.join(here, "reconciliation.sql")] if os.path.exists(p))
+sql = "\n".join(l.split("--")[0] for l in open(sql_path, encoding="utf-8").read().splitlines())
 for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
     if stmt.upper().startswith(("CREATE", "DROP")):
         con.execute(stmt)

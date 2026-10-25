@@ -41,20 +41,20 @@ def rand_date(a=START, b=END):
 
 # ---------------------------------------------------------------- suppliers
 names = [
-    "Mleczarnia Podlasie Sp. z o.o.", "Agro-Fruit S.A.", "Piekarnia Krakowiak Sp. z o.o.",
-    "Sad Dystrybucja Sp. z o.o.", "Napoje Beskid S.A.", "Chemia Dom Sp. z o.o.",
-    "Opakowania Polska S.A.", "Mięso-Pol Sp. z o.o.", "Słodycze Mazury Sp. z o.o.",
-    "Ryby Bałtyk S.A.", "Kawa Import Sp. z o.o.", "Papier Plus Sp. z o.o.",
-    "Warzywa Mazowsze Sp. z o.o.", "Logistyka Trans S.A.", "Kosmetyki Natura Sp. z o.o.",
-    "Browar Śląski S.A.", "Olej Rzepak Sp. z o.o.", "Makaron Zamojski Dystr. Sp. z o.o.",
-    "Przyprawy Orient Sp. z o.o.", "Mrożonki Arktyka S.A.",
+    "Northfield Dairy Ltd", "AgroFresh Produce Ltd", "Golden Crust Bakery Ltd",
+    "Orchard Valley Distribution Ltd", "Mountain Spring Beverages PLC", "CleanHome Chemicals Ltd",
+    "PackRight Solutions PLC", "Prime Meat Supply Ltd", "Lakeside Confectionery Ltd",
+    "Seaside Seafood PLC", "Coffee Import Co. Ltd", "PaperPlus Ltd",
+    "Green Valley Vegetables Ltd", "TransLogistics PLC", "Natura Cosmetics Ltd",
+    "Silesian Brewery PLC", "Golden Oil Ltd", "Pasta House Distribution Ltd",
+    "Orient Spices Ltd", "Arctic Frozen Foods PLC",
     "Nordic Foods GmbH", "Italia Pasta S.r.l.", "Dutch Dairy B.V.", "Iberia Olive S.L.",
     "Bohemia Glass s.r.o.", "Alpen Snacks GmbH", "Baltic Fish AB", "Danube Grain Kft.",
     "Fresh Fruit Hellas S.A.", "Euro Pack GmbH",
-    "Higiena Max Sp. z o.o.", "Soki Sadownik Sp. z o.o.", "Jaja Fermy Sp. z o.o.",
-    "Drób Wielkopolska S.A.", "Herbata Świat Sp. z o.o.", "Cukier Królewski S.A.",
-    "Woda Źródło Sp. z o.o.", "Sery Mazurskie Sp. z o.o.", "Pet Food Polska S.A.",
-    "Bakalie Natura Sp. z o.o.",
+    "HygieneMax Ltd", "Fresh Press Juices Ltd", "Farm Fresh Eggs Ltd",
+    "Poultry Partners PLC", "World of Tea Ltd", "Royal Sugar PLC",
+    "Clear Spring Water Ltd", "Lakeland Cheese Ltd", "PetFood Supplies PLC",
+    "Nuts & Dried Fruit Co. Ltd",
 ]
 suppliers = []
 for i, n in enumerate(names, 1):
@@ -129,11 +129,13 @@ sup_terms = dict(zip(sup.supplier_id, sup.payment_terms_days))
 
 
 def typo(name):
+    """How the same supplier can look on a bank statement."""
+    words = name.split(" ")
     variants = [
-        name.upper(),
-        name.replace("Sp. z o.o.", "SP ZOO").replace("S.A.", "SA"),
-        name.replace("ó", "o").replace("ł", "l").replace("ś", "s").replace("ż", "z").replace("ą", "a").replace("ę", "e"),
-        name.split(" ")[0] + " " + name.split(" ")[1] if len(name.split(" ")) > 2 else name + ".",
+        name.upper(),                                                    # all caps
+        name.replace(" Ltd", " LTD.").replace(" PLC", " P.L.C."),        # different legal-form spelling
+        " ".join(words[:-1]),                                            # legal form dropped
+        name.replace("&", "and").replace(" Co.", " Company") + ".",     # spelled out
     ]
     return random.choice(variants)
 
@@ -168,7 +170,7 @@ for r in po.itertuples():
         inv_price = round(r.unit_price * random.uniform(1.03, 1.15), 2)
     inv_date = receipt_date + timedelta(days=random.randint(0, 5))
     inv_n += 1
-    inv_no = f"FV/{inv_date.year}/{inv_date.month:02d}/{inv_n:05d}"
+    inv_no = f"INV-{inv_date.year}-{inv_date.month:02d}-{inv_n:05d}"
     amount = round(inv_qty * inv_price, 2)
     inv = {"invoice_id": f"INV{inv_n:05d}", "invoice_number": inv_no, "supplier_id": r.supplier_id,
            "po_id": r.po_id, "invoice_date": inv_date, "qty_invoiced": inv_qty,
@@ -226,7 +228,7 @@ for _ in range(45):
     d = rand_date(START, END - timedelta(days=60))
     inv_n += 1
     amt = round(random.uniform(300, 25000), 2)
-    inv_no = f"FV/{d.year}/{d.month:02d}/{inv_n:05d}"
+    inv_no = f"INV-{d.year}-{d.month:02d}-{inv_n:05d}"
     invoices.append({"invoice_id": f"INV{inv_n:05d}", "invoice_number": inv_no, "supplier_id": s.supplier_id,
                      "po_id": None, "invoice_date": d, "qty_invoiced": None, "unit_price": None,
                      "amount": amt, "currency": s.currency})
@@ -251,6 +253,7 @@ for _ in range(15):
 # ---------------------------------------------------------------- save
 grn = pd.DataFrame(grns)
 inv_df = pd.DataFrame(invoices)
+inv_df["qty_invoiced"] = inv_df["qty_invoiced"].astype("Int64")  # keep integers despite NULLs
 pay = pd.DataFrame(payments).sort_values("payment_date").reset_index(drop=True)
 key_df = pd.DataFrame(answer_key)
 
