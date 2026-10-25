@@ -6,3 +6,4 @@ bpi_data/
 *.xes.gz
 fuzzy_matches.csv
 validation_report.csv
+results.txt
