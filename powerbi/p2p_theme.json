@@ -1,0 +1,19 @@
+{
+  "name": "P2P Reconciliation",
+  "dataColors": ["#1F4E79", "#9AA5B1", "#C0392B", "#2E86C1", "#F39C12", "#27AE60", "#7F8C8D", "#5D6D7E"],
+  "background": "#FFFFFF",
+  "foreground": "#252423",
+  "tableAccent": "#1F4E79",
+  "good": "#27AE60",
+  "neutral": "#F39C12",
+  "bad": "#C0392B",
+  "maximum": "#1F4E79",
+  "center": "#9AA5B1",
+  "minimum": "#EAF0F6",
+  "textClasses": {
+    "callout": { "fontSize": 28, "fontFace": "Segoe UI Semibold", "color": "#1F4E79" },
+    "title": { "fontSize": 12, "fontFace": "Segoe UI Semibold", "color": "#252423" },
+    "header": { "fontSize": 12, "fontFace": "Segoe UI Semibold", "color": "#252423" },
+    "label": { "fontSize": 10, "fontFace": "Segoe UI", "color": "#605E5C" }
+  }
+}
