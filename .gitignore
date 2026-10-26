@@ -7,3 +7,6 @@ bpi_data/
 fuzzy_matches.csv
 validation_report.csv
 results.txt
+real_data/raw/
+real_data/results/payments_clean.csv
+real_data/dhsc_2025_06.csv
