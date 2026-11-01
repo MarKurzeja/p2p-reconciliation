@@ -136,30 +136,44 @@ All tests below run on **third-party spend only**.
 
 ## How to run
 
+The project includes a command-line runner (`run.py`) so workflows can be started from the repository root without changing directories. Python 3.12 or newer is required by the pinned NumPy version. Dependencies, including transitive dependencies, are pinned in [`requirements.txt`](requirements.txt).
+
 ```bash
-# 1. Python environment
-python3 -m venv .venv && source .venv/bin/activate
-pip install pandas numpy openpyxl rapidfuzz
+# Create and activate a virtual environment (macOS/Linux)
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 
-# 2. Generate the data
-python python/generate_data.py
+# Run the local Part A demo: generate data, validate it, and run the SQL analysis
+python run.py demo
+```
 
-# 3. Load into PostgreSQL and reconcile
+Run individual workflows with the same runner:
+
+```bash
+python run.py generate                     # create synthetic CSVs in data/
+python run.py validate                     # fuzzy-match payments and check answer key
+python run.py sql                          # analyze data/ with SQLite (no server needed)
+python run.py sql --save                   # also save the SQLite database as p2p.db
+python run.py download                     # download the 2025 DHSC spending data
+python run.py download 2024                # download another year
+python run.py analyze                      # analyze the downloaded 2025 data
+python run.py analyze 2024                 # analyze another downloaded year
+python run.py xes /path/to/log.xes.gz      # optional BPI XES-to-CSV conversion
+```
+
+`validate`, `sql`, and `analyze` need their corresponding input data first. `download` accesses GOV.UK over the network. The runner uses the Python interpreter that starts it, so activate `.venv` before running commands.
+
+### Optional: PostgreSQL and Power BI
+
+For the server-backed SQL workflow, generate the data first, then run:
+
+```bash
 createdb p2p
 psql -d p2p -f sql/01_schema.sql
 psql -d p2p -f sql/02_load.sql
 psql -d p2p -f sql/reconciliation.sql
-psql -d p2p -f sql/03_export_powerbi.sql   # CSVs for Power BI
-
-# 4. Fuzzy matching and validation
-python python/validate.py
-
-# No PostgreSQL? Run the same SQL on SQLite:
-python python/run_sql.py
-
-# Part B - real data
-python python/download_gov_spend.py      # downloads 12 monthly CSVs from gov.uk
-python python/analyze_gov_spend.py       # audit tests -> real_data/results/
+psql -d p2p -f sql/03_export_powerbi.sql
 ```
 
 Then open `powerbi/p2p_reconciliation.pbix` in Power BI Desktop.
@@ -175,6 +189,8 @@ p2p-reconciliation/
 │   ├── download_gov_spend.py # Part B: download + clean real DHSC payments
 │   ├── analyze_gov_spend.py  # Part B: segmentation + audit tests
 │   └── xes_to_csv.py         # converter for the BPI Challenge 2019 log (optional)
+├── run.py                    # command-line runner for project workflows
+├── requirements.txt          # exact Python dependency versions
 ├── sql/
 │   ├── 01_schema.sql         # tables, keys, constraints, indexes
 │   ├── 02_load.sql           # load CSVs
