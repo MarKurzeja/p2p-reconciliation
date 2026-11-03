@@ -2,7 +2,7 @@
 Synthetic data generator: Procure-to-Pay Reconciliation
 (purchase orders vs goods receipts vs supplier invoices vs bank payments)
 
-Run:     python generate_data.py
+Run:     python run.py generate   (or: python python/generate_data.py)
 Output (data/ folder):
   suppliers.csv, purchase_orders.csv, goods_receipts.csv,
   supplier_invoices.csv, bank_payments.csv, fx_rates.csv,
@@ -15,6 +15,7 @@ Requires: pandas, numpy  (pip install pandas numpy)
 import os
 import random
 from datetime import date, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -22,7 +23,8 @@ import pandas as pd
 SEED = 42
 N_PO = 3000
 START, END = date(2026, 1, 1), date(2026, 6, 30)
-OUT = "data"
+ROOT = Path(__file__).resolve().parent.parent  # project root, so the script works from any folder
+OUT = ROOT / "data"
 
 random.seed(SEED)
 np.random.seed(SEED)

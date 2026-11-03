@@ -1,5 +1,6 @@
 -- Export the reconciliation results for Power BI.
--- Run AFTER sql/reconciliation.sql:  psql -d p2p -f sql/03_export_powerbi.sql
+-- Run from the project root AFTER sql/03_reconciliation.sql:
+--   psql -d p2p -f sql/04_export_powerbi.sql
 \! mkdir -p powerbi/data
 \copy (SELECT supplier_id, supplier_name, country, currency, payment_terms_days FROM suppliers ORDER BY supplier_id) TO 'powerbi/data/dim_suppliers.csv' WITH (FORMAT csv, HEADER true)
 \copy (SELECT t.po_id, t.invoice_id, t.supplier_id, t.currency, t.po_date, DATE_TRUNC('month', t.po_date)::date AS po_month, t.qty_ordered, t.qty_received, t.qty_invoiced, t.po_price, t.invoice_price, t.invoice_date, t.receipt_date, t.invoice_amount, ROUND(t.invoice_amount * CASE WHEN t.currency = 'EUR' THEN fx.eur_pln ELSE 1 END, 2) AS invoice_amount_pln, t.match_status, CASE WHEN t.match_status IN ('MATCHED', 'MATCHED_TIMING') THEN 1 ELSE 0 END AS is_matched, ROUND(COALESCE(t.overbilled_amount, 0) * CASE WHEN t.currency = 'EUR' THEN fx.eur_pln ELSE 1 END, 2) AS overbilled_pln FROM v_three_way t LEFT JOIN fx_rates fx ON fx.rate_date = t.invoice_date ORDER BY t.po_id) TO 'powerbi/data/fact_three_way.csv' WITH (FORMAT csv, HEADER true)

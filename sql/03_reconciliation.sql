@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Procure-to-Pay Reconciliation: PO vs Goods Receipt vs Invoice vs Bank
--- Runs as-is on PostgreSQL 16+ and on SQLite (python/run_sql.py).
+-- Runs as-is on PostgreSQL 16+ and on SQLite 3.25+ (python/run_sql.py).
 -- Tables: suppliers, purchase_orders, goods_receipts,
 --         supplier_invoices, bank_payments, fx_rates
 -- =====================================================================
@@ -16,7 +16,9 @@ DROP VIEW IF EXISTS v_three_way;
 -- ---------------------------------------------------------------------
 -- Q1. 3-WAY MATCH at purchase-order level (PO + goods receipt + invoice)
 --     Every PO gets exactly one category.
---     FULL OUTER JOIN so that invoices without a PO are caught too.
+--     The `keys` CTE emulates a FULL OUTER JOIN (all POs + invoices whose PO
+--     does not exist), so invoices without a PO are caught too. SQLite only
+--     supports FULL OUTER JOIN from 3.39, so the portable form is used.
 -- ---------------------------------------------------------------------
 CREATE VIEW v_three_way AS
 WITH grn AS (
@@ -35,6 +37,15 @@ inv AS (                                   -- only the first invoice with a give
         FROM supplier_invoices i
     ) x
     WHERE rn = 1
+),
+keys AS (
+    SELECT po.po_id AS key_po, inv.invoice_id AS key_inv
+    FROM purchase_orders po
+    LEFT JOIN inv ON inv.po_id = po.po_id
+    UNION ALL
+    SELECT NULL, inv.invoice_id
+    FROM inv
+    WHERE NOT EXISTS (SELECT 1 FROM purchase_orders p WHERE p.po_id = inv.po_id)
 )
 SELECT
     COALESCE(po.po_id, inv.po_id)                    AS po_id,
@@ -66,9 +77,10 @@ SELECT
                                      THEN inv.qty_invoiced ELSE grn.qty_received END
                                 * po.unit_price, 2)
     END AS overbilled_amount
-FROM purchase_orders po
+FROM keys k
+LEFT JOIN purchase_orders po ON po.po_id = k.key_po
 LEFT JOIN grn ON grn.po_id = po.po_id
-FULL OUTER JOIN inv ON inv.po_id = po.po_id;
+LEFT JOIN inv ON inv.invoice_id = k.key_inv;
 
 
 -- Q1 summary
@@ -118,7 +130,7 @@ SELECT
     ROUND(CASE WHEN i.currency = 'EUR' THEN i.amount * fx.eur_pln
                ELSE i.amount END, 2)                 AS expected_pln,
     ROW_NUMBER() OVER (PARTITION BY i.invoice_number, i.supplier_id
-                       ORDER BY p.payment_date)      AS pay_seq
+                       ORDER BY p.payment_date, p.payment_id) AS pay_seq   -- payment_id breaks same-day ties
 FROM bank_payments p
 JOIN supplier_invoices i
      ON i.invoice_number = p.transfer_title

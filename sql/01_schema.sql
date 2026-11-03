@@ -70,7 +70,7 @@ CREATE TABLE bank_payments (
     amount_pln       NUMERIC(14, 2) NOT NULL
 );
 
--- Indexes for the join columns used in reconciliation.sql
+-- Indexes for the join columns used in 03_reconciliation.sql
 CREATE INDEX ix_grn_po          ON goods_receipts (po_id);
 CREATE INDEX ix_inv_po          ON supplier_invoices (po_id);
 CREATE INDEX ix_inv_number      ON supplier_invoices (supplier_id, invoice_number);

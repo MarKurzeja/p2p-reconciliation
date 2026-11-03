@@ -3,7 +3,7 @@ Convert the BPI Challenge 2019 log (.xes or .xes.gz) into CSV tables
 ready for SQL / Power BI.
 
 Run:
-    python xes_to_csv.py "BPI_Challenge_2019.xes"
+    python run.py xes "BPI_Challenge_2019.xes"
 
 Requires only pandas (the XML parser is built into Python; pm4py is not needed).
 The file has ~1.6M events: conversion takes a few minutes and needs ~2-4 GB of RAM.
@@ -21,10 +21,13 @@ import gzip
 import os
 import sys
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import pandas as pd
 
-OUT = "bpi_data"
+ROOT = Path(__file__).resolve().parent.parent  # project root, so the script works from any folder
+
+OUT = str(ROOT / "bpi_data")
 
 # column names without spaces or dots, easier in SQL
 RENAME = {

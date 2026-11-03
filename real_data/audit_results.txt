@@ -51,6 +51,7 @@ Top supplier alone: GENOMICS ENGLAND LTD - 4.7%
 Pairs flagged: 581   Value of the second payment: £196,424,161
   of which same transaction number (likely re-published rows): 5
   of which different transaction number (needs review):        576
+  review list - same day, different transaction number:        65 pairs, £3,673,102
                       pairs     value_gbp
 pattern                                  
 Monthly (27-31 days)    321  £161,390,155

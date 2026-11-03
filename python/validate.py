@@ -2,7 +2,8 @@
 Step 6: fuzzy matching of payments without an invoice number + validation of
 results against answer_key.csv.
 
-Run (after generate_data.py):  python validate.py
+Run (after generate_data.py):  python run.py validate
+Output: output/validation_report.csv, output/fuzzy_matches.csv
 Requires: pandas  (optional rapidfuzz: pip install rapidfuzz - faster and better;
 without it the script falls back to the built-in difflib)
 """
@@ -11,6 +12,7 @@ import os
 import re
 import sqlite3
 import unicodedata
+from pathlib import Path
 
 import pandas as pd
 
@@ -25,7 +27,10 @@ except ImportError:  # fallback without extra libraries
     def similarity(a, b):
         return 100 * SequenceMatcher(None, a, b).ratio()
 
-D = "data"
+ROOT = Path(__file__).resolve().parent.parent  # project root, so the script works from any folder
+D = ROOT / "data"
+OUT = ROOT / "output"
+OUT.mkdir(exist_ok=True)
 sup = pd.read_csv(f"{D}/suppliers.csv")
 po = pd.read_csv(f"{D}/purchase_orders.csv")
 grn = pd.read_csv(f"{D}/goods_receipts.csv")
@@ -86,7 +91,11 @@ for p in unmatched_pay.itertuples():
                     & (open_inv.invoice_date >= p.payment_date - pd.Timedelta(days=75))].copy()
     if cand.empty:
         continue
-    rate = fx_map.get(p.payment_date, 1.0)
+    rate = fx_map.get(p.payment_date)
+    if rate is None:  # no EUR rate for that day: only PLN invoices can be compared
+        cand = cand[cand.currency.eq("PLN")]
+        if cand.empty:
+            continue
     cand["expected_pln"] = cand.amount * cand.currency.map({"EUR": rate, "PLN": 1.0})
     cand["amt_diff"] = (cand.expected_pln - p.amount_pln).abs() / cand.expected_pln
     best = cand.sort_values("amt_diff").iloc[0]
@@ -95,7 +104,7 @@ for p in unmatched_pay.itertuples():
                            "name_score": round(p.name_score), "amt_diff_pct": round(100 * best.amt_diff, 2)})
         open_inv = open_inv[open_inv.invoice_id != best.invoice_id]
 
-fuzzy = pd.DataFrame(fuzzy_rows)
+fuzzy = pd.DataFrame(fuzzy_rows, columns=["payment_id", "invoice_id", "name_score", "amt_diff_pct"])
 still_unmatched = unmatched_pay[~unmatched_pay.payment_id.isin(fuzzy.payment_id)]
 
 print("=== Payment matching ===")
@@ -106,17 +115,14 @@ print(f"Unmatched:                      {len(still_unmatched)}  "
       f"(total {still_unmatched.amount_pln.sum():,.2f} PLN)")
 print(f"Payment match rate:             {100 * (len(matched_exact) + len(fuzzy)) / len(pay):.1f}%\n")
 
-# ------------------------------------------------------------------ 4. SQL results (same rules as reconciliation.sql)
+# ------------------------------------------------------------------ 4. SQL results (same rules as sql/03_reconciliation.sql)
 con = sqlite3.connect(":memory:")
 for name, df in [("suppliers", sup.drop(columns="name_norm")), ("purchase_orders", po),
                  ("goods_receipts", grn), ("supplier_invoices", pd.read_csv(f"{D}/supplier_invoices.csv")),
                  ("bank_payments", pd.read_csv(f"{D}/bank_payments.csv")),
                  ("fx_rates", pd.read_csv(f"{D}/fx_rates.csv"))]:
     df.to_sql(name, con, index=False)
-here = os.path.dirname(os.path.abspath(__file__))
-sql_path = next(p for p in ["sql/reconciliation.sql", "reconciliation.sql",
-                            os.path.join(here, "..", "sql", "reconciliation.sql"),
-                            os.path.join(here, "reconciliation.sql")] if os.path.exists(p))
+sql_path = ROOT / "sql" / "03_reconciliation.sql"
 sql = "\n".join(l.split("--")[0] for l in open(sql_path, encoding="utf-8").read().splitlines())
 for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
     if stmt.upper().startswith(("CREATE", "DROP")):
@@ -127,7 +133,6 @@ dups = pd.read_sql("SELECT * FROM v_duplicate_invoices", con)
 ps = pd.read_sql("SELECT * FROM v_payment_status", con)
 
 # ------------------------------------------------------------------ 5. comparison with the answer key
-inv_by_po = inv.drop_duplicates("po_id").set_index("po_id").invoice_id
 found = {
     "MISSING_GOODS_RECEIPT": set(tw.loc[tw.match_status == "INVOICE_WITHOUT_RECEIPT", "po_id"]),
     "QTY_INVOICED_ABOVE_RECEIVED": set(tw.loc[tw.match_status == "QTY_INVOICED_ABOVE_RECEIVED", "invoice_id"]),
@@ -156,5 +161,6 @@ print(report.to_string(index=False))
 print("\nNot checked directly: SUPPLIER_NAME_VARIANT (handled by name normalization),")
 print("UNPAID_INVOICE (needs aging vs payment terms), PARTIAL_RECEIPT_OK (correct by design).")
 
-report.to_csv("validation_report.csv", index=False)
-fuzzy.to_csv("fuzzy_matches.csv", index=False)
+report.to_csv(OUT / "validation_report.csv", index=False)
+fuzzy.to_csv(OUT / "fuzzy_matches.csv", index=False)
+print(f"\nSaved {OUT.name}/validation_report.csv and {OUT.name}/fuzzy_matches.csv")

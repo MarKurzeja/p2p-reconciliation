@@ -28,9 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser("validate", help="run fuzzy matching and validate against the answer key")
 
     sql = commands.add_parser("sql", help="run a SQL file against CSV data using SQLite")
-    sql.add_argument("sql_file", nargs="?", help="SQL file (default: sql/reconciliation.sql)")
+    sql.add_argument("sql_file", nargs="?", help="SQL file (default: sql/03_reconciliation.sql)")
     sql.add_argument("data_dir", nargs="?", help="CSV directory (default: data)")
-    sql.add_argument("--save", action="store_true", help="save results to p2p.db")
+    sql.add_argument("--save", action="store_true", help="save the SQLite database to output/p2p.db")
 
     download = commands.add_parser("download", help="download and combine DHSC spending data")
     download.add_argument("year", nargs="?", help="year to download (default: 2025)")

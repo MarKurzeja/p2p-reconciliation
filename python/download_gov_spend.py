@@ -6,9 +6,9 @@ Source: GOV.UK transparency data, Department of Health and Social Care
 https://www.gov.uk/government/collections/dhsc-spending-over-25000
 Licence: Open Government Licence v3.0
 
-Run from the project root:
-    python python/download_gov_spend.py            # 2025
-    python python/download_gov_spend.py 2024       # another year
+Run:
+    python run.py download            # 2025
+    python run.py download 2024       # another year
 
 Output:
     real_data/raw/dhsc_<year>_<mm>.csv     one file per month, as published
@@ -26,16 +26,19 @@ import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 import pandas as pd
+
+ROOT = Path(__file__).resolve().parent.parent  # project root, so the script works from any folder
 
 YEAR = int(sys.argv[1]) if len(sys.argv) > 1 else 2025
 MONTHS = ["january", "february", "march", "april", "may", "june", "july",
           "august", "september", "october", "november", "december"]
 API = "https://www.gov.uk/api/content/government/publications/dhsc-spending-over-25000-{m}-{y}"
 PAGE = "https://www.gov.uk/government/publications/dhsc-spending-over-25000-{m}-{y}"
-RAW_DIR = "real_data/raw"
-OUT = f"real_data/dhsc_spend_{YEAR}.csv"
+RAW_DIR = str(ROOT / "real_data" / "raw")
+OUT = str(ROOT / "real_data" / f"dhsc_spend_{YEAR}.csv")
 
 # standard column names, in the order GOV.UK spend files normally use
 STANDARD = ["department_family", "entity", "date", "expense_type", "expense_area",
@@ -165,7 +168,7 @@ def main():
     all_df.insert(0, "payment_id", [f"P{n:06d}" for n in range(1, len(all_df) + 1)])
     all_df.to_csv(OUT, index=False)
 
-    print(f"\nSaved {OUT}: {len(all_df):,} payments, {all_df['supplier'].nunique():,} suppliers, "
+    print(f"\nSaved {os.path.relpath(OUT, ROOT)}: {len(all_df):,} payments, {all_df['supplier'].nunique():,} suppliers, "
           f"{all_df['amount'].sum():,.0f} GBP")
     print(f"Rows with an unreadable date: {all_df['date'].isna().sum()}")
     if missing:

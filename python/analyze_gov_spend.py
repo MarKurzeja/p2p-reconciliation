@@ -9,20 +9,23 @@ Tests (the same kind an audit / AP analytics team runs):
   5. Benford's law: first-digit distribution of amounts (a standard fraud-screening test)
   6. Data quality: redacted suppliers, missing fields
 
-Run from the project root, after python/download_gov_spend.py:
-    python python/analyze_gov_spend.py
+Run after the download step:
+    python run.py analyze            (or: python python/analyze_gov_spend.py)
 Output: printed summary + CSV files in real_data/results/ (for Power BI)
 """
 
 import math
 import os
 import sys
+from pathlib import Path
 
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parent.parent  # project root, so the script works from any folder
+
 YEAR = int(sys.argv[1]) if len(sys.argv) > 1 else 2025
-SRC = f"real_data/dhsc_spend_{YEAR}.csv"
-OUT = "real_data/results"
+SRC = ROOT / "real_data" / f"dhsc_spend_{YEAR}.csv"
+OUT = ROOT / "real_data" / "results"
 DUP_WINDOW_DAYS = 30
 
 pd.set_option("display.width", 160)
@@ -67,7 +70,7 @@ print("=" * 78)
 seg = df.groupby("segment").agg(payments=("payment_id", "size"), total_gbp=("amount", "sum"))
 seg["share_of_value_pct"] = (100 * seg["total_gbp"] / df.loc[df["amount"] > 0, "amount"].sum()).round(1)
 print(seg.assign(total_gbp=seg["total_gbp"].map(gbp)).to_string())
-seg.reset_index().to_csv(f"{OUT}/segments.csv", index=False)
+seg.round(2).reset_index().to_csv(f"{OUT}/segments.csv", index=False)
 print("Tests 2-5 below run on THIRD-PARTY SPEND only.\n")
 
 tp = df[df["segment"].eq("Third-party spend")].copy()   # third-party spend
@@ -75,14 +78,14 @@ named = tp[~tp["supplier_redacted"]].copy()
 
 # ------------------------------------------------------------------ 1. overview
 print("=" * 78)
-print(f"1. OVERVIEW  |  {SRC}")
+print(f"1. OVERVIEW  |  {SRC.relative_to(ROOT)}")
 print("=" * 78)
 print(f"Payments: {len(df):,}   Suppliers: {df.loc[~df['supplier_redacted'], 'supplier'].nunique():,}   "
       f"Total (net of receipts): {gbp(df['amount'].sum())}")
 print(f"Median payment: {gbp(df['amount'].median())}   Largest: {gbp(df['amount'].max())}")
 by_month = df.groupby("month").agg(payments=("payment_id", "size"), total_gbp=("amount", "sum")).reset_index()
 print(by_month.assign(total_gbp=by_month["total_gbp"].map(gbp)).to_string(index=False))
-by_month.to_csv(f"{OUT}/by_month.csv", index=False)
+by_month.round(2).to_csv(f"{OUT}/by_month.csv", index=False)
 
 # ------------------------------------------------------------------ 2. concentration
 print("\n" + "=" * 78)
@@ -126,6 +129,8 @@ dups = dups.sort_values(["priority", "amount"], ascending=[True, False])
 print(f"Pairs flagged: {len(dups):,}   Value of the second payment: {gbp(dups['amount'].sum())}")
 print(f"  of which same transaction number (likely re-published rows): {int(dups['same_transaction_number'].sum())}")
 print(f"  of which different transaction number (needs review):        {int((~dups['same_transaction_number']).sum())}")
+review = dups[dups["pattern"].eq("Same day") & ~dups["same_transaction_number"]]
+print(f"  review list - same day, different transaction number:        {len(review)} pairs, {gbp(review['amount'].sum())}")
 print(dups.groupby("pattern")["amount"].agg(["size", "sum"]).rename(columns={"size": "pairs", "sum": "value_gbp"})
       .assign(value_gbp=lambda x: x["value_gbp"].map(gbp)).to_string())
 print("Highest priority first (same day, different transaction number):")
@@ -188,4 +193,4 @@ for col in ["transaction_number", "expense_type", "description"]:
     print(f"Missing {col:<20} {int(blank.sum()):>6,} rows ({100 * blank.mean():.1f}%)")
 
 df.to_csv(f"{OUT}/payments_clean.csv", index=False)
-print(f"\nResults saved to {OUT}/")
+print(f"\nResults saved to {OUT.relative_to(ROOT)}/")

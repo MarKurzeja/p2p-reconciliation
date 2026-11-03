@@ -3,9 +3,9 @@ Run a SQL file against the CSV tables without installing a database server.
 Loads every CSV from a data folder into SQLite and prints each query result.
 
 Usage (from the project root):
-    python python/run_sql.py                          # sql/reconciliation.sql on data/
+    python python/run_sql.py                          # sql/03_reconciliation.sql on data/
     python python/run_sql.py sql/bpi_compliance.sql bpi_data
-    python python/run_sql.py --save                   # also writes p2p.db (open it in
+    python python/run_sql.py --save                   # also writes output/p2p.db (open it in
                                                       # DB Browser for SQLite or Power BI)
 
 Requires: pandas
@@ -16,19 +16,25 @@ import os
 import re
 import sqlite3
 import sys
+from pathlib import Path
 
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parent.parent  # project root, so the script works from any folder
+
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
-sql_file = args[0] if len(args) > 0 else "sql/reconciliation.sql"
-data_dir = args[1] if len(args) > 1 else "data"
+sql_file = args[0] if len(args) > 0 else str(ROOT / "sql" / "03_reconciliation.sql")
+data_dir = args[1] if len(args) > 1 else str(ROOT / "data")
 save = "--save" in sys.argv
 rows_to_show = 15
 
 pd.set_option("display.width", 200)
 pd.set_option("display.max_columns", 20)
 
-con = sqlite3.connect("p2p.db" if save else ":memory:")
+db_path = ROOT / "output" / "p2p.db"
+if save:
+    db_path.parent.mkdir(exist_ok=True)
+con = sqlite3.connect(db_path if save else ":memory:")
 csvs = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
 if not csvs:
     sys.exit(f"No CSV files in '{data_dir}/'. Run python/generate_data.py first.")
@@ -70,4 +76,4 @@ for title, code in statements:
 
 if save:
     con.commit()
-    print("Saved database to p2p.db")
+    print(f"Saved database to {db_path.relative_to(ROOT)}")

@@ -1,0 +1,41 @@
+supplier_id,supplier_name,country,currency,payment_terms_days
+SUP001,Northfield Dairy Ltd,PL,PLN,14
+SUP002,AgroFresh Produce Ltd,PL,PLN,14
+SUP003,Golden Crust Bakery Ltd,PL,PLN,45
+SUP004,Orchard Valley Distribution Ltd,PL,PLN,30
+SUP005,Mountain Spring Beverages PLC,PL,PLN,30
+SUP006,CleanHome Chemicals Ltd,PL,PLN,30
+SUP007,PackRight Solutions PLC,PL,PLN,14
+SUP008,Prime Meat Supply Ltd,PL,PLN,14
+SUP009,Lakeside Confectionery Ltd,PL,PLN,60
+SUP010,Seaside Seafood PLC,PL,PLN,14
+SUP011,Coffee Import Co. Ltd,PL,PLN,14
+SUP012,PaperPlus Ltd,PL,PLN,14
+SUP013,Green Valley Vegetables Ltd,PL,PLN,30
+SUP014,TransLogistics PLC,PL,PLN,30
+SUP015,Natura Cosmetics Ltd,PL,PLN,14
+SUP016,Silesian Brewery PLC,PL,PLN,30
+SUP017,Golden Oil Ltd,PL,PLN,60
+SUP018,Pasta House Distribution Ltd,PL,PLN,30
+SUP019,Orient Spices Ltd,PL,PLN,60
+SUP020,Arctic Frozen Foods PLC,PL,PLN,45
+SUP021,Nordic Foods GmbH,EU,EUR,14
+SUP022,Italia Pasta S.r.l.,EU,EUR,30
+SUP023,Dutch Dairy B.V.,EU,EUR,60
+SUP024,Iberia Olive S.L.,EU,EUR,45
+SUP025,Bohemia Glass s.r.o.,EU,EUR,45
+SUP026,Alpen Snacks GmbH,EU,EUR,30
+SUP027,Baltic Fish AB,EU,EUR,30
+SUP028,Danube Grain Kft.,EU,EUR,45
+SUP029,Fresh Fruit Hellas S.A.,EU,EUR,14
+SUP030,Euro Pack GmbH,EU,EUR,14
+SUP031,HygieneMax Ltd,PL,PLN,60
+SUP032,Fresh Press Juices Ltd,PL,PLN,14
+SUP033,Farm Fresh Eggs Ltd,PL,PLN,45
+SUP034,Poultry Partners PLC,PL,PLN,45
+SUP035,World of Tea Ltd,PL,PLN,45
+SUP036,Royal Sugar PLC,PL,PLN,14
+SUP037,Clear Spring Water Ltd,PL,PLN,60
+SUP038,Lakeland Cheese Ltd,PL,PLN,14
+SUP039,PetFood Supplies PLC,PL,PLN,60
+SUP040,Nuts & Dried Fruit Co. Ltd,PL,PLN,14

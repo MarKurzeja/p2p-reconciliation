@@ -1,13 +1,17 @@
+# Python environment
 .venv/
 __pycache__/
-data/
-bpi_data/
+
+# Generated data (recreate with run.py) - anchored to the root so powerbi/data/ stays tracked
+/data/
+/bpi_data/
 *.xes
 *.xes.gz
-fuzzy_matches.csv
-validation_report.csv
-results.txt
 real_data/raw/
 real_data/results/payments_clean.csv
-real_data/dhsc_2025_06.csv
+
+# Script outputs (validation report, fuzzy matches, SQLite database)
+output/
+*.db
+
 .DS_Store

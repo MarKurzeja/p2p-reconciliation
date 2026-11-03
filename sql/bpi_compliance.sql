@@ -1,5 +1,6 @@
 -- =====================================================================
--- BPI Challenge 2019: Purchase-to-Pay process compliance checks
+-- BPI Challenge 2019: Purchase-to-Pay process compliance checks (SQLite dialect)
+-- Run: python run.py sql sql/bpi_compliance.sql bpi_data
 -- Tables from xes_to_csv.py: po_items, goods_receipts, invoices,
 -- invoice_clearing, events.  Tested on SQLite.
 -- DIALECT: julianday() -> PostgreSQL: EXTRACT(EPOCH FROM (b - a)) / 86400
