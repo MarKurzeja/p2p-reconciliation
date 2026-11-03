@@ -1,5 +1,7 @@
 # Procure-to-Pay Reconciliation
 
+[![CI](https://github.com/MarKurzeja/p2p-reconciliation/actions/workflows/ci.yml/badge.svg)](https://github.com/MarKurzeja/p2p-reconciliation/actions/workflows/ci.yml)
+
 **SQL (PostgreSQL, SQLite) · Python (pandas) · Power BI · DAX**
 
 An Accounts Payable audit project in two parts:
@@ -28,7 +30,7 @@ An Accounts Payable audit project in two parts:
 - **3 suppliers cause 35% of discrepancies**, so targeted supplier reviews pay off fastest.
 - 170 orders only *look* wrong: 100 have a late goods receipt and 70 are correctly invoiced partial deliveries. Telling these apart from real losses avoids wasted review time.
 
-**Validation:** 10 planted error types were all detected with **100% recall and 100% precision**, measured against the answer key (`output/validation_report.csv`).
+**Validation:** 10 planted error types were all detected with **100% recall and 100% precision**, measured against the answer key. CI re-runs this check on every push and fails if any score drops below 100%.
 
 ## Part B – Real data audit (UK DHSC, 2025)
 
@@ -58,6 +60,7 @@ pip install -r requirements.txt
 
 python run.py demo        # Part A: generate data → validate → SQL (SQLite)
 python run.py analyze     # Part B: audit tests on the 2025 data
+python run.py check       # what CI runs: Part A with strict validation
 ```
 
 The optional PostgreSQL workflow runs the scripts `sql/01_schema.sql` → `04_export_powerbi.sql` in order, from the project root. After that, open `powerbi/p2p_reconciliation.pbix`.
@@ -70,8 +73,9 @@ sql/        01_schema → 02_load → 03_reconciliation → 04_export_powerbi
 real_data/  2025 DHSC payments + audit results
 powerbi/    dashboard + its data
 run.py      single entry point for all workflows
+.github/    CI workflow
 ```
 
 ---
 
-**Maria Kurzeja** · [GitHub](https://github.com/MarKurzeja)
+**Maria Kurzeja** · [GitHub](https://github.com/MarKurzeja) · MIT licence (DHSC data under the Open Government Licence v3.0)

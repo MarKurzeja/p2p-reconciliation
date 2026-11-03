@@ -187,7 +187,8 @@ FROM v_duplicate_invoices
 UNION ALL
 SELECT 'payment', payment_id, supplier_id, payment_status, diff_pln, 'PLN'
 FROM v_payment_status
-WHERE payment_status NOT IN ('PAYMENT_MATCHED');
+WHERE payment_status NOT IN ('PAYMENT_MATCHED',
+                             'PAID_TWICE');  -- = payment side of DUPLICATE_INVOICE; count each issue once
 
 SELECT discrepancy_type, COUNT(*) AS n
 FROM v_discrepancy_report

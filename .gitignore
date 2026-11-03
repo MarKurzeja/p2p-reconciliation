@@ -4,9 +4,6 @@ __pycache__/
 
 # Generated data (recreate with run.py) - anchored to the root so powerbi/data/ stays tracked
 /data/
-/bpi_data/
-*.xes
-*.xes.gz
 real_data/raw/
 real_data/results/payments_clean.csv
 

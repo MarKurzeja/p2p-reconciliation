@@ -20,7 +20,6 @@ Requires: pandas (only the standard library is used for downloading)
 import csv
 import io
 import json
-import os
 import re
 import subprocess
 import sys
@@ -32,13 +31,11 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent  # project root, so the script works from any folder
 
-YEAR = int(sys.argv[1]) if len(sys.argv) > 1 else 2025
 MONTHS = ["january", "february", "march", "april", "may", "june", "july",
           "august", "september", "october", "november", "december"]
 API = "https://www.gov.uk/api/content/government/publications/dhsc-spending-over-25000-{m}-{y}"
 PAGE = "https://www.gov.uk/government/publications/dhsc-spending-over-25000-{m}-{y}"
-RAW_DIR = str(ROOT / "real_data" / "raw")
-OUT = str(ROOT / "real_data" / f"dhsc_spend_{YEAR}.csv")
+RAW_DIR = ROOT / "real_data" / "raw"
 
 # standard column names, in the order GOV.UK spend files normally use
 STANDARD = ["department_family", "entity", "date", "expense_type", "expense_area",
@@ -136,12 +133,14 @@ def tidy(text, source_month):
 
 
 def main():
-    os.makedirs(RAW_DIR, exist_ok=True)
+    year = int(sys.argv[1]) if len(sys.argv) > 1 else 2025
+    out = ROOT / "real_data" / f"dhsc_spend_{year}.csv"
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
     frames, missing = [], []
     for i, month in enumerate(MONTHS, 1):
-        label = f"{YEAR}-{i:02d}"
+        label = f"{year}-{i:02d}"
         try:
-            links = csv_links(month, YEAR)
+            links = csv_links(month, year)
         except Exception as e:  # page not published yet, or network error
             missing.append(f"{label} ({str(e)[:80]})")
             continue
@@ -151,7 +150,7 @@ def main():
         for j, url in enumerate(links):
             raw = get(url)
             suffix = "" if j == 0 else f"_{j + 1}"
-            path = f"{RAW_DIR}/dhsc_{YEAR}_{i:02d}{suffix}.csv"
+            path = RAW_DIR / f"dhsc_{year}_{i:02d}{suffix}.csv"
             with open(path, "wb") as f:
                 f.write(raw)
             df = tidy(read_any_encoding(raw), label)
@@ -166,9 +165,9 @@ def main():
         sys.exit("Nothing downloaded.")
     all_df = pd.concat(frames, ignore_index=True)
     all_df.insert(0, "payment_id", [f"P{n:06d}" for n in range(1, len(all_df) + 1)])
-    all_df.to_csv(OUT, index=False)
+    all_df.to_csv(out, index=False)
 
-    print(f"\nSaved {os.path.relpath(OUT, ROOT)}: {len(all_df):,} payments, {all_df['supplier'].nunique():,} suppliers, "
+    print(f"\nSaved {out.relative_to(ROOT)}: {len(all_df):,} payments, {all_df['supplier'].nunique():,} suppliers, "
           f"{all_df['amount'].sum():,.0f} GBP")
     print(f"Rows with an unreadable date: {all_df['date'].isna().sum()}")
     if missing:
