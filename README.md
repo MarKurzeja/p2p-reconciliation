@@ -1,224 +1,77 @@
 # Procure-to-Pay Reconciliation
 
-**SQL (PostgreSQL) · Python (pandas) · Power BI · DAX**
+**SQL (PostgreSQL, SQLite) · Python (pandas) · Power BI · DAX**
 
-An end-to-end reconciliation of purchase orders, goods receipts, supplier invoices and bank payments – the "3-way match" control used in Accounts Payable and tested in financial audits.
+An Accounts Payable audit project in two parts:
 
-The project has two parts:
-
-- **Part A – Reconciliation (synthetic data):** the full 3-way match + bank reconciliation, validated against an answer key of planted errors.
-- **Part B – Audit analytics (real data):** the same audit mindset applied to **18,819 real supplier payments (£214.7bn)** published by the UK Department of Health and Social Care for 2025.
+- **Part A:** a 3-way match (PO ↔ goods receipt ↔ invoice) plus bank reconciliation on synthetic data, validated against an answer key of planted errors.
+- **Part B:** audit analytics on **18,819 real UK Department of Health payments (£214.7bn, 2025)**.
 
 ![Executive Overview dashboard](images/executive_overview.png)
 
 ---
 
-## Part A – Reconciliation (synthetic data)
+## Part A – Reconciliation
 
-### Business problem
-
-At quarter-end close, internal audit at a (fictional) FMCG distributor noticed that **payments to suppliers exceeded the value of goods received**. Procurement said the orders were correct, Accounting said it paid according to invoices – but nobody had compared the four systems document by document.
-
-**Goal:** match every payment to an invoice, goods receipt and purchase order, quantify mismatches in PLN, separate real losses from timing delays, and recommend permanent controls.
-
-### Key results
+**Problem:** payments to suppliers exceeded the value of goods received. The task was to match every payment to its invoice, goods receipt and purchase order, then quantify the losses.
 
 | Metric | Result |
 | --- | --- |
-| Purchase orders passing 3-way match | **91.6%** (2,790 of 3,045) |
-| Invoiced value at risk | **3.79M PLN** (3.2% of 116.7M PLN invoiced) |
+| POs passing 3-way match | **91.6%** (2,790 of 3,045) |
+| Value at risk | **3.79M PLN** (3.2% of invoiced) |
 | Duplicate invoices paid twice | **30 invoices, 1.08M PLN** |
-| Overpayment from a stale EUR rate | **0.26M PLN** on 40 payments |
-| Payments matched automatically | **99.5%** (SQL exact match + Python fuzzy match) |
-| Payments with no invoice at all | **15 transfers, 0.29M PLN** |
+| Overpayment from stale EUR rate | **0.26M PLN** on 40 payments |
+| Payments matched automatically | **99.5%** (SQL exact + Python fuzzy) |
 
-### Insights
+**Key findings**
+- Invoices with no goods receipt make up **63% of the value at risk** (2.37M PLN).
+- **3 suppliers cause 35% of discrepancies**, so targeted supplier reviews pay off fastest.
+- 170 orders only *look* wrong: 100 have a late goods receipt and 70 are correctly invoiced partial deliveries. Telling these apart from real losses avoids wasted review time.
 
-1. **Paying for goods that never arrived is the biggest risk.** 60 invoices without a goods receipt account for **2.37M PLN – 63% of the value at risk**.
-2. **Duplicates are rare but expensive.** Only 1% of invoices, yet 1.08M PLN – and every złoty is recoverable from suppliers.
-3. **The problem is concentrated.** Three suppliers (World of Tea, AgroFresh Produce, PaperPlus) cause **35% of all discrepancies**, so targeted supplier reviews give the fastest return.
-4. **Not every mismatch is a loss.** 100 orders only had the goods receipt registered late, and 70 were partial deliveries invoiced correctly. Flagging them as errors would waste the team's time.
-5. **Off-process purchasing exists.** 45 invoices (0.80M PLN) have no purchase order at all, so they bypass the approval process.
-6. **One hard-coded value costs money.** Converting EUR at a fixed 4.50 instead of the daily rate caused a systematic overpayment of 0.26M PLN.
-7. **Match rate is stable at ~92% every month** – this is a process gap, not a one-off incident.
+**Validation:** 10 planted error types were all detected with **100% recall and 100% precision**, measured against the answer key (`output/validation_report.csv`).
 
-### Recommendations
+## Part B – Real data audit (UK DHSC, 2025)
 
-1. Enforce automatic 3-way match: no invoice is released for payment without a PO and a goods receipt.
-2. Block duplicate invoice numbers per supplier at booking.
-3. Introduce a price tolerance (e.g. 1%) with buyer approval above it.
-4. Pull FX rates automatically (NBP) for the payment date – no hard-coded values.
-5. Require the invoice number in the transfer title in supplier contracts.
-6. Separate approval path for advances and "urgent" payments without an invoice.
-7. Replace the quarterly review with a weekly automated reconciliation report.
+Source: [DHSC spending over £25,000](https://www.gov.uk/government/collections/dhsc-spending-over-25000) (Open Government Licence v3.0).
 
-### Approach
+![Real data audit dashboard](images/real_data_audit.png)
 
-```
-CSV data ──► PostgreSQL ──► SQL reconciliation ──► Python fuzzy matching ──► Power BI
-(6 tables)   (schema,       (views, CTEs,          & validation against      (star schema,
-              keys)          window functions)      an answer key            DAX measures)
-```
+- **Understand the data before testing it.** 98% of the value is government funding (for example £199bn to NHS England), not purchasing. The audit tests run only on the **£3.9bn of third-party spend**.
+- **Duplicates:** 581 candidate pairs (same supplier and amount within 30 days) were narrowed to **65 same-day pairs (£3.7M)** that need review. Most of the others follow a monthly contract pattern.
+- **Top item to review:** Fresenius Medical Care received 4 × £201,110 on the same day, each with a different transaction number.
+- **Benford's law** shows nonconformity, but this is explained by the £25k publication threshold rather than manipulation.
 
-| Step | What | Techniques |
-| --- | --- | --- |
-| 1. Data | 6 related tables, 13 planted issue types (incl. 3 deliberate "false alarms") | Python, pandas, NumPy |
-| 2. Database | Schema with primary/foreign keys, constraints and indexes | PostgreSQL |
-| 3. Reconciliation | 3-way match, duplicate detection, payment matching, monthly trend, supplier ranking | Full outer join (portable `LEFT JOIN` + `UNION ALL`), `NOT EXISTS`, CTEs, `ROW_NUMBER`, `RANK`, `UNION ALL`, views |
-| 4. Fuzzy matching | Payments without an invoice number matched by supplier name similarity, amount (±2%) and date window | rapidfuzz / difflib, pandas |
-| 5. Validation | Results compared with an answer key of planted errors – recall and precision per issue type | pandas |
-| 6. Dashboard | Star schema (1 dimension, 4 facts), DAX measures, Top N filters, supplier slicer | Power BI, DAX |
+## Skills demonstrated
 
-### Validation
-
-Because the dataset is synthetic, every planted error is known. The method was tested against this answer key:
-
-| Issue type | Planted | Found | Recall | Precision |
-| --- | --- | --- | --- | --- |
-| Invoice without goods receipt | 60 | 60 | 100% | 100% |
-| Quantity invoiced above received | 90 | 90 | 100% | 100% |
-| Price above PO | 60 | 60 | 100% | 100% |
-| Invoice without PO | 45 | 45 | 100% | 100% |
-| Late goods receipt (timing, not a loss) | 100 | 100 | 100% | 100% |
-| Duplicate invoice | 30 | 30 | 100% | 100% |
-| Stale FX rate | 40 | 40 | 100% | 100% |
-| Partial payment | 30 | 30 | 100% | 100% |
-| Payment without invoice reference | 120 | 120 | 100% | 100% |
-| Payment without any invoice | 15 | 15 | 100% | 100% |
-
-### Data
-
-The data is **synthetic**, generated by `python/generate_data.py` (fixed random seed, so results are reproducible). Suppliers, invoices and amounts are fictional. Using generated data with known errors is what makes it possible to measure how accurate the reconciliation is.
-
-| Table | Source system | Rows |
-| --- | --- | --- |
-| `purchase_orders` | ERP purchasing | 3,000 |
-| `goods_receipts` | Warehouse (WMS) | 2,940 |
-| `supplier_invoices` | Accounts Payable | 3,075 |
-| `bank_payments` | Bank statement | 3,000 |
-| `suppliers` | Master data | 40 |
-| `fx_rates` | Daily EUR/PLN | 271 |
-
-## Part B – Audit analytics on real data (UK Department of Health, 2025)
-
-**Source:** [DHSC spending over £25,000](https://www.gov.uk/government/collections/dhsc-spending-over-25000) – every payment above £25,000 made by the UK Department of Health and Social Care, published monthly as open data (Open Government Licence v3.0). Twelve monthly files for 2025 were downloaded, cleaned and combined by `python/download_gov_spend.py`; the tests are in `python/analyze_gov_spend.py`.
-
-| Metric | Result |
+| Area | Techniques |
 | --- | --- |
-| Payments analysed | **18,819** (Jan–Dec 2025) |
-| Total value | **£214.7bn** net of receipts |
-| Of which real third-party spend | **£3.9bn (1.7%)** in 11,668 payments |
-| Named suppliers (third-party) | **680** |
-| Same-day identical payments to review | **65 pairs, £3.7M** |
-
-![Real data audit analytics dashboard](images/real_data_audit.png)
-
-### Step 1 – Understand the data before testing it
-
-The first run showed **one "supplier" receiving 93% of all money** and 815 "duplicate" payments. Both were misleading: the file mixes **budget transfers inside government** (e.g. £199bn to NHS England, funding of agencies, capital and loans to NHS trusts) with **real purchases from suppliers**. Running audit tests on budget transfers produces noise, so payments were first segmented:
-
-| Segment | Payments | Value | Share |
-| --- | --- | --- | --- |
-| Government funding & transfers | 5,743 | £225.1bn | 98.3% |
-| Third-party spend | 11,668 | £3.9bn | 1.7% |
-| Receipts & refunds (negative) | 1,408 | –£14.3bn | – |
-
-All tests below run on **third-party spend only**.
-
-### Findings
-
-1. **Supplier concentration is moderate.** 74 of 680 suppliers (10.9%) receive 80% of third-party spend; the largest (Genomics England) has only 4.7%, so there is no single-supplier dependency.
-2. **Most "duplicates" are recurring payments, not errors.** Of 581 pairs with the same supplier and amount within 30 days, 321 follow a monthly pattern (contracts, fees). The review list is narrowed to **65 same-day pairs (£3.7M)** with different transaction numbers (4 more same-day pairs share a transaction number, so they are republished rows rather than payments).
-3. **Top item to review:** Fresenius Medical Care UK – **four payments of £201,110 on the same day** (10 Sep 2025) with different transaction numbers. This may be four separate invoices, but it is exactly the kind of item an auditor would ask the AP team to explain.
-4. **A whole block of funding transfers appears twice on 3 March 2025** – NHS England £11.6bn ×2, NHSBSA £39M ×2, MHRA £10M ×2 (73 same-day identical funding payments, £23.4bn). Most likely two planned drawdowns before financial year-end, but worth confirming.
-5. **Round amounts are explainable.** 3.8% of third-party payments are exact multiples of £10,000, mostly research grants, which are awarded in round sums.
-6. **Benford's law shows "nonconformity" (MAD 0.018) – but this is a limitation of the data, not a red flag.** The file only contains payments above £25,000, so amounts starting with 1 (£10–19k) are cut off and amounts starting with 3 (£30–39k) are over-represented. Knowing when a test does *not* apply is part of using it correctly.
-7. **Data quality is good:** 276 payments (£1.17bn) have the supplier withheld for personal-data reasons; only 0.6% lack a transaction number.
+| SQL | Star schema, PK/FK constraints, views, CTEs, window functions (`ROW_NUMBER`, `RANK`), anti-joins, a portable full outer join |
+| Python | pandas, data generation with planted errors, fuzzy matching (rapidfuzz), messy CSV ingestion from GOV.UK |
+| Analytics | 3-way match, duplicate detection, FX reconciliation, Pareto, Benford, validation with precision/recall |
+| Power BI | Star schema, DAX measures, Top N, slicers |
 
 ## How to run
 
-The project includes a command-line runner (`run.py`) so workflows can be started from the repository root without changing directories. Python 3.12 or newer is required by the pinned NumPy version. Dependencies, including transitive dependencies, are pinned in [`requirements.txt`](requirements.txt).
-
 ```bash
-# Create and activate a virtual environment (macOS/Linux)
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 
-# Run the local Part A demo: generate data, validate it, and run the SQL analysis
-python run.py demo
+python run.py demo        # Part A: generate data → validate → SQL (SQLite)
+python run.py analyze     # Part B: audit tests on the 2025 data
 ```
 
-Run individual workflows with the same runner:
+The optional PostgreSQL workflow runs the scripts `sql/01_schema.sql` → `04_export_powerbi.sql` in order, from the project root. After that, open `powerbi/p2p_reconciliation.pbix`.
 
-```bash
-python run.py generate                     # create synthetic CSVs in data/
-python run.py validate                     # fuzzy-match payments and check answer key
-python run.py sql                          # analyze data/ with SQLite (no server needed)
-python run.py sql --save                   # also save the SQLite database as output/p2p.db
-python run.py download                     # download the 2025 DHSC spending data
-python run.py download 2024                # download another year
-python run.py analyze                      # analyze the downloaded 2025 data
-python run.py analyze 2024                 # analyze another downloaded year
-python run.py xes /path/to/log.xes.gz      # optional BPI XES-to-CSV conversion
-```
-
-`validate`, `sql`, and `analyze` need their corresponding input data first. Scripts can be run from any folder; generated data goes to `data/`, and the validation report, fuzzy matches and SQLite database go to `output/`. `download` accesses GOV.UK over the network. The runner uses the Python interpreter that starts it, so activate `.venv` before running commands.
-
-### Optional: PostgreSQL and Power BI
-
-For the server-backed SQL workflow, generate the data first, then run:
-
-```bash
-createdb p2p
-psql -d p2p -f sql/01_schema.sql
-psql -d p2p -f sql/02_load.sql
-psql -d p2p -f sql/03_reconciliation.sql
-psql -d p2p -f sql/04_export_powerbi.sql
-```
-
-Run the `psql` commands from the project root, because `\copy` paths are relative to it. Then open `powerbi/p2p_reconciliation.pbix` in Power BI Desktop; it reads the CSVs in `powerbi/data/`, which are included in the repository.
-
-## Repository structure
+## Structure
 
 ```
-p2p-reconciliation/
-├── run.py                    # command-line runner for project workflows
-├── requirements.txt          # exact Python dependency versions
-├── python/
-│   ├── generate_data.py      # Part A: synthetic data + answer key
-│   ├── validate.py           # Part A: fuzzy matching + validation
-│   ├── run_sql.py            # run SQL on SQLite (no server needed)
-│   ├── download_gov_spend.py # Part B: download + clean real DHSC payments
-│   ├── analyze_gov_spend.py  # Part B: segmentation + audit tests
-│   └── xes_to_csv.py         # converter for the BPI Challenge 2019 log (optional)
-├── sql/
-│   ├── 01_schema.sql         # tables, keys, constraints, indexes (PostgreSQL)
-│   ├── 02_load.sql           # load CSVs (PostgreSQL)
-│   ├── 03_reconciliation.sql # 3-way match, duplicates, payments, trend, ranking
-│   ├── 04_export_powerbi.sql # star-schema export for Power BI (PostgreSQL)
-│   └── bpi_compliance.sql    # compliance checks for the BPI 2019 log (SQLite, optional)
-├── data/                     # Part A: generated CSVs + answer key (not committed)
-├── output/                   # validation report, fuzzy matches, p2p.db (not committed)
-├── real_data/
-│   ├── raw/                  # monthly DHSC files as published (not committed)
-│   ├── dhsc_spend_2025.csv   # combined, cleaned 2025 payments
-│   ├── audit_results.txt     # printed audit summary
-│   └── results/              # audit test results used by the dashboard
-├── powerbi/
-│   ├── p2p_reconciliation.pbix
-│   ├── p2p_theme.json
-│   └── data/                 # star-schema CSVs the dashboard reads
-└── images/                   # dashboard screenshots
+python/     data generation, validation, SQL runner, GOV.UK download + analysis
+sql/        01_schema → 02_load → 03_reconciliation → 04_export_powerbi
+real_data/  2025 DHSC payments + audit results
+powerbi/    dashboard + its data
+run.py      single entry point for all workflows
 ```
-
-## Next steps
-
-- Aging analysis of unpaid invoices (overdue vs. not yet due).
-- Sensitivity analysis of fuzzy-matching thresholds (precision vs. recall).
-- Benford test on first-two digits, which is less affected by the £25,000 threshold.
-- Extend Part B to several years and other departments to compare payment patterns.
 
 ---
 
-**Author:** Maria Kurzeja · [GitHub](https://github.com/MarKurzeja)
+**Maria Kurzeja** · [GitHub](https://github.com/MarKurzeja)
